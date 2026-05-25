@@ -24,6 +24,7 @@
 #include <zmk/behavior_queue.h>
 #include <drivers/behavior.h>
 #include <zmk/events/mouse_gesture_state_changed.h>
+#include <zmk/mouse_gesture/runtime.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -118,14 +119,7 @@ struct mouse_rel_msg {
 
 K_MSGQ_DEFINE(mouse_rel_msgq, sizeof(struct mouse_rel_msg), CONFIG_ZMK_MOUSE_GESTURE_REL_QUEUE_LEN, 4);
 
-struct gesture_pattern {
-    size_t bindings_len;
-    const struct zmk_behavior_binding *bindings;
-    size_t pattern_len;
-    uint32_t wait_ms;
-    uint32_t tap_ms;
-    const uint8_t *pattern;
-};
+/* struct gesture_pattern moved to <zmk/mouse_gesture/runtime.h> for Phase 5 runtime API */
 
 static void build_gesture_trie(struct input_processor_mouse_gesture_data *data, const struct gesture_pattern *patterns, size_t pattern_count) {
     if (!data->gesture_trie_root) {
@@ -642,5 +636,43 @@ DT_INST_FOREACH_STATUS_OKAY(MOUSE_GESTURE_INPUT_PROCESSOR_INST)
 // Register event listener
 ZMK_LISTENER(mouse_gesture_input_processor, mouse_gesture_state_listener);
 ZMK_SUBSCRIPTION(mouse_gesture_input_processor, zmk_mouse_gesture_state_changed);
+
+/* === Phase 5: runtime gesture set ============================================== */
+
+int zmk_mouse_gesture_runtime_set(const struct gesture_pattern *patterns,
+                                   size_t count) {
+    const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+    if (!dev || !device_is_ready(dev)) {
+        return -ENODEV;
+    }
+    struct input_processor_mouse_gesture_data *data = dev->data;
+    if (!data) return -ENODEV;
+
+    k_mutex_lock(&data->lock, K_FOREVER);
+
+    /* Rebuild the trie from scratch. */
+    memset(data->gesture_nodes_pool, 0, sizeof(data->gesture_nodes_pool));
+    data->gesture_nodes_count = 0;
+    data->gesture_trie_root = NULL;
+    build_gesture_trie(data, patterns, count);
+
+    /* Reset matching state. */
+    data->current_node = data->gesture_trie_root;
+    data->acc_x = 0;
+    data->acc_y = 0;
+    data->last_direction = GESTURE_NONE;
+    k_work_cancel_delayable(&data->idle_timeout_work);
+
+    k_mutex_unlock(&data->lock);
+    return 0;
+}
+
+#else  /* !DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT) */
+
+int zmk_mouse_gesture_runtime_set(const struct gesture_pattern *patterns,
+                                   size_t count) {
+    (void)patterns; (void)count;
+    return -ENODEV;
+}
 
 #endif
