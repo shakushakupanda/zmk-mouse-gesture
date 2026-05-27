@@ -650,27 +650,18 @@ int zmk_mouse_gesture_runtime_set(const struct gesture_pattern *patterns,
 
     k_mutex_lock(&data->lock, K_FOREVER);
 
-    /* Defense: drain in-flight work that may still hold pointers into the
-     * old trie. The work cb takes data->lock, so by the time we've locked,
-     * no other thread is mid-traversal. Set current_node to NULL FIRST so
-     * any new event sees "no active node" and bails out before we wipe
-     * the pool. */
-    data->is_active = false;
-    data->current_node = NULL;
-    data->acc_x = 0;
-    data->acc_y = 0;
-    data->last_direction = GESTURE_NONE;
-    k_work_cancel_delayable(&data->idle_timeout_work);
-
     /* Rebuild the trie from scratch. */
     memset(data->gesture_nodes_pool, 0, sizeof(data->gesture_nodes_pool));
     data->gesture_nodes_count = 0;
     data->gesture_trie_root = NULL;
     build_gesture_trie(data, patterns, count);
 
-    /* Restore state. build_gesture_trie should always allocate the root,
-     * but defend against the pool-exhausted case anyway. */
+    /* Reset matching state. */
     data->current_node = data->gesture_trie_root;
+    data->acc_x = 0;
+    data->acc_y = 0;
+    data->last_direction = GESTURE_NONE;
+    k_work_cancel_delayable(&data->idle_timeout_work);
 
     k_mutex_unlock(&data->lock);
     return 0;
