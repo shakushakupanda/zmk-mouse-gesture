@@ -17,6 +17,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <drivers/behavior.h>  /* for struct zmk_behavior_binding */
 
 #ifdef __cplusplus
@@ -49,6 +50,13 @@ struct gesture_pattern {
  */
 int zmk_mouse_gesture_runtime_set(const struct gesture_pattern *patterns,
                                    size_t count);
+
+/* When enabled, relative X/Y events consumed by the mouse gesture processor
+ * stop in the input-processor chain instead of moving the cursor. This is
+ * intended to be toggled while a gesture key is held.
+ */
+void zmk_mouse_gesture_runtime_set_suppress_cursor(bool suppress);
+bool zmk_mouse_gesture_runtime_get_suppress_cursor(void);
 
 #ifdef __cplusplus
 }

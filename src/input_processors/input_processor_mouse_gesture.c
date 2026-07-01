@@ -28,6 +28,8 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
+static bool g_suppress_cursor;
+
 #if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
 
 #define MAX_GESTURE_SEQUENCE_LENGTH 8
@@ -509,7 +511,7 @@ static int input_processor_mouse_gesture_handle_event(const struct device *dev,
 
     k_work_submit(&gesture_exec_work);
 
-    return ZMK_INPUT_PROC_CONTINUE;
+    return g_suppress_cursor ? ZMK_INPUT_PROC_STOP : ZMK_INPUT_PROC_CONTINUE;
 }
 
 static int input_processor_mouse_gesture_init(const struct device *dev) {
@@ -666,12 +668,28 @@ int zmk_mouse_gesture_runtime_set(const struct gesture_pattern *patterns,
     k_mutex_unlock(&data->lock);
     return 0;
 }
+
+void zmk_mouse_gesture_runtime_set_suppress_cursor(bool suppress) {
+    g_suppress_cursor = suppress;
+}
+
+bool zmk_mouse_gesture_runtime_get_suppress_cursor(void) {
+    return g_suppress_cursor;
+}
 #else  /* !DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT) */
 
 int zmk_mouse_gesture_runtime_set(const struct gesture_pattern *patterns,
                                    size_t count) {
     (void)patterns; (void)count;
     return -ENODEV;
+}
+
+void zmk_mouse_gesture_runtime_set_suppress_cursor(bool suppress) {
+    (void)suppress;
+}
+
+bool zmk_mouse_gesture_runtime_get_suppress_cursor(void) {
+    return false;
 }
 
 #endif
