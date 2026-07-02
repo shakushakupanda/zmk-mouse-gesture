@@ -571,6 +571,12 @@ static int mouse_gesture_state_listener(const zmk_event_t *eh) {
         DT_INST_FOREACH_STATUS_OKAY(MOUSE_GESTURE_DEV_ITEM)
     };
 
+    /* Keep cursor suppression local to the input processor that consumes the
+     * trackball events. This is more reliable on split builds than only setting
+     * the flag from the behavior implementation.
+     */
+    zmk_mouse_gesture_runtime_set_suppress_cursor(ev->is_active);
+
     for (size_t i = 0; i < ARRAY_SIZE(mouse_gesture_devs); i++) {
         struct state_action_msg msg = {
             .dev = mouse_gesture_devs[i],
